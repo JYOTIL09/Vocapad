@@ -1,7 +1,8 @@
 import React, { useState } from "react";
-import { db } from "../firebaseConfig";
 import { collection, addDoc, serverTimestamp } from "firebase/firestore";
 import { toast } from "react-toastify";
+import { createUserWithEmailAndPassword } from "firebase/auth";
+import { auth, db } from "../firebaseConfig";
 
 export default function RegistrationForm() {
   const [step, setStep] = useState(1);
@@ -66,39 +67,65 @@ export default function RegistrationForm() {
     }
   };
 
-  const handleSubmit = async () => {
-    if (validateUsername()) {
-      try {
-        await addDoc(collection(db, "users"), {
-          email,
-          password,
-          username,
-          createdAt: serverTimestamp(),
-        });
+    const handleSubmit = async () => {
+        if (validateUsername()) {
+            try {
+                const userCredential = await createUserWithEmailAndPassword(
+                    auth,
+                    email,
+                    password,
+                    username
+                );
+                const user = userCredential.user;
 
-        toast.success("User registered successfully!", {
-          position: "top-center",
-          autoClose: 3000,
-        });
+                await addDoc(collection(db, "users"), {
+                    uid: user.uid,
+                    email,
+                    displayName : username,
+                    createdAt: serverTimestamp(),
+                });
 
-        setEmail("");
-        setPassword("");
-        setConfirmPassword("");
-        setUsername("");
-        setStep(1);
-      } catch (error) {
-        console.error("Error saving user:", error);
-      }
-    }
-  };
+                toast.success("User registered successfully!", {
+                    position: "top-center",
+                    autoClose: 3000,
+                });
 
-  return (
+                // Reset form
+                setEmail("");
+                setPassword("");
+                setConfirmPassword("");
+                setUsername("");
+                setStep(1);
+            } catch (error) {
+                console.error("Error creating user:", error);
+                if(error.message.includes("email-already-in-use")){
+                    toast.error("You are already registered. Please Log in");
+                    return;
+                }
+                toast.error("Registration failed."+error.message);
+            }
+        }
+    };
+
+
+    return (
     <div className="flex items-center justify-center min-h-screen bg-gray-100 px-4">
-      <div className="bg-white shadow-lg rounded-xl p-8 w-full max-w-md">
-        <h2 className="text-2xl font-bold mb-6 text-center text-gray-800">
-          Register
-        </h2>
+      <div className="bg-white shadow-lg rounded-xl pb-8 w-full max-w-md">
+          <div className="max-w-screen-xl flex flex-wrap items-center justify-between mx-auto p-4 rounded-t-lg border-gray-200 bg-gray-900">
+              <a href="#" className="flex items-center space-x-3 rtl:space-x-reverse">
+                  <img src="https://flowbite.com/docs/images/logo.svg" className="h-9" alt="Flowbite Logo"/>
+                  <span
+                      className="self-center text-2xl font-semibold whitespace-nowrap text-white">VocaPad</span>
+              </a>
 
+          </div>
+
+        <h2 className="text-2xl font-bold mt-3 text-center text-gray-800">
+          Register
+
+        </h2>
+          <span className={`block text-center`}>Already a user? <a className={`underline font-bold`} href={`/login`}>Login </a> </span>
+          <div className={`p-8 pb-5 pt-0`}>
         {step === 1 && (
           <>
             <label className="block text-gray-700 mb-2">Email</label>
@@ -174,6 +201,7 @@ export default function RegistrationForm() {
             </button>
           </>
         )}
+          </div>
       </div>
     </div>
   );
